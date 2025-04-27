@@ -1,0 +1,14 @@
+{
+    "cameras": [
+        {
+            "id": 1,
+            "homography": [
+                [0.5, 0, -100],
+                [0, 0.5, -50],
+                [0.001, 0.002, 1]
+            ]
+        }
+    ],
+    "bev": {"grid_resolution": 0.05},
+    "tracker": {"max_age": 30, "dist_threshold": 1.0}
+}
