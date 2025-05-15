@@ -4,10 +4,8 @@ import json
 
 # === CONFIGURACIÓN ===
 IP_CAMERAS = [
-    {"id": 1, "url": "http://192.168.0.2:4747/video"},
-    {"id": 2, "url": "http://192.168.0.19:4747/video"},
-    {"id": 3, "url": "http://192.168.0.7:4747/video"},
-    {"id": 4, "url": "http://192.168.0.3:4747/video"}
+    {"id": 1, "url": "http://192.168.0.24:4747/video"},
+    {"id": 2, "url": "http://192.168.0.4:4747/video"}
 ]
 
 # Puntos en el mundo real (metros)
