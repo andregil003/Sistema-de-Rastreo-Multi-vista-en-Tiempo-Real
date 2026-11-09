@@ -1,0 +1,17 @@
+{
+  "camara_principal_id": "",
+  "fps_reconocimiento_ms": 300,
+  "frames_entre_chequeo_telefono": 10,
+  "umbral_similitud_rostro": 0.36,
+  "focal_px_aproximada": 550,
+  "altura_rostro_cm": 23.0,
+  "resolucion_captura": [
+    640,
+    480
+  ],
+  "calidad_jpeg_stream": 70,
+  "max_cameras_usb_escaneo": 4,
+  "camaras_usb_indices": [],
+  "camaras_desactivadas": [],
+  "colores_personas": {}
+}

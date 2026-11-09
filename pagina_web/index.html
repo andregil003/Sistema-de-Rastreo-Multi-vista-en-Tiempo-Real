@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Reconocimiento Facial Multi-cámara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="/web/estilos_meet.css">
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="bg-veil"></div>
+
+<header class="barra_superior">
+  <div class="logo">
+    <span class="icono_camara"><i class="fa-solid fa-video"></i></span>
+    <div>
+      <h1>Reconocimiento Facial Multi-cámara</h1>
+      <p id="estado_sistema" class="subestado">Conectando…</p>
+    </div>
+  </div>
+  <nav class="pestanas">
+    <button data-tab="reconocimiento" class="pestana activa"><i class="fa-solid fa-face-smile"></i> Reconocimiento</button>
+    <button data-tab="camaras" class="pestana"><i class="fa-solid fa-camera"></i> Cámaras</button>
+    <button data-tab="registro" class="pestana"><i class="fa-solid fa-user-plus"></i> Registro</button>
+    <button data-tab="alertas" class="pestana" id="btn_tab_alertas"><i class="fa-solid fa-triangle-exclamation"></i> Alertas <span id="badge_alertas" class="badge oculto">0</span></button>
+    <a href="/movil" class="enlace_movil" title="Página simple para el celular"><i class="fa-solid fa-mobile-screen"></i> Modo celular</a>
+  </nav>
+</header>
+
+<main>
+
+<section id="tab_reconocimiento" class="tab activa">
+  <div class="zona_principal">
+    <div class="escenario">
+      <img id="video_principal" alt="Cámara principal">
+      <div class="hud_izq">
+        <span id="badge_envivo" class="badge_envivo"><span class="dot_rec"></span>En vivo</span>
+        <span id="hud_reloj" class="reloj_mono">--:--:--</span>
+      </div>
+      <div class="etiqueta_escenario" id="etiqueta_principal"><i class="fa-solid fa-satellite-dish"></i> Esperando cámaras…</div>
+      <button id="btn_fullscreen" class="btn_fullscreen" title="Pantalla completa"><i class="fa-solid fa-expand"></i></button>
+    </div>
+    <aside class="panel_stats">
+      <h2><i class="fa-solid fa-chart-simple"></i> Estadísticas en vivo</h2>
+      <div id="lista_stats" class="lista_stats">
+        <p class="vacio">Sin personas en escena</p>
+      </div>
+      <h2 class="titulo_seccion"><i class="fa-solid fa-clock-rotate-left"></i> Últimos reconocimientos</h2>
+      <div id="ultimos_recs" class="lista_stats">
+        <p class="vacio">Sin historial aún</p>
+      </div>
+    </aside>
+  </div>
+  <div class="fila_prueba">
+    <button id="btn_probar_rec" class="secundario"><i class="fa-solid fa-stethoscope"></i> Probar reconocimiento ahora</button>
+    <span id="resultado_prueba" class="resultado_prueba"></span>
+  </div>
+  <div class="filmstrip" id="filmstrip"></div>
+</section>
+
+<section id="tab_camaras" class="tab">
+  <h2><i class="fa-solid fa-display"></i> Cámaras conectadas a tu computadora y navegadores</h2>
+  <p class="ayuda">La cámara principal ocupa el escenario grande. Haz clic en cualquier tarjeta para designarla.</p>
+  <div class="controles_camaras">
+    <button id="btn_reescanear" class="secundario"><i class="fa-solid fa-magnifying-glass"></i> Detectar cámaras</button>
+    <button id="btn_reiniciar_usb" class="secundario"><i class="fa-solid fa-rotate-left"></i> Reiniciar cámaras USB</button>
+    <span id="estado_controles_cam" class="ayuda"></span>
+  </div>
+  <div id="grid_camaras" class="grid_camaras"></div>
+</section>
+
+<section id="tab_registro" class="tab">
+  <div class="registro_layout">
+    <div class="tarjeta_form">
+      <h2><i class="fa-solid fa-user-plus"></i> Registrar mi rostro</h2>
+      <p class="ayuda">Escribe tu nombre y deja que la cámara te capture. Quedarás guardado para ser reconocido después frente a las cámaras.</p>
+      <label>Tu nombre</label>
+      <input type="text" id="reg_nombre" placeholder="Nombre">
+      <label class="label_selector"><i class="fa-solid fa-camera-rotate"></i> ¿Qué cámara usar?</label>
+      <select id="selector_cam_reg" class="selector_camara"></select>
+      <div id="preview_registro" class="preview_registro">
+        <video id="video_registro" autoplay playsinline muted></video>
+        <img id="img_registro_sys" class="oculto" alt="Cámara del sistema">
+        <canvas id="canvas_registro" class="oculto"></canvas>
+        <p class="placeholder_preview">Tu cámara aparecerá aquí</p>
+      </div>
+      <div class="botones_registro">
+        <button id="btn_activar_cam_reg" class="secundario"><i class="fa-solid fa-camera"></i> Activar mi cámara</button>
+        <button id="btn_registrar" class="primario" disabled><i class="fa-solid fa-check"></i> Registrarme</button>
+      </div>
+      <p id="resultado_registro" class="resultado"></p>
+    </div>
+    <div class="columna_info">
+      <div class="tarjeta_info">
+        <h2><i class="fa-solid fa-users"></i> Personas registradas</h2>
+        <p>Personas registradas: <span id="contador_personas">0</span></p>
+      </div>
+      <div class="tarjeta_info">
+        <h2><i class="fa-solid fa-palette"></i> Colores de reconocimiento</h2>
+        <p class="ayuda">Cada persona tiene su color en las cajas del video. Haz clic para cambiarlo.</p>
+        <div id="lista_colores" class="lista_colores"><p class="vacio">Cargando…</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tab_alertas" class="tab">
+  <h2><i class="fa-solid fa-shield-halved"></i> Historial de alertas (replay por teléfono)</h2>
+  <div id="lista_alertas" class="lista_alertas"><p class="vacio">Sin alertas registradas</p></div>
+</section>
+
+</main>
+
+<div id="toasts" class="contenedor_toasts"></div>
+
+<div id="modal_alerta" class="modal_fondo oculto">
+  <div class="modal_alerta">
+    <h2><i class="fa-solid fa-triangle-exclamation"></i> ALERTA DE SEGURIDAD</h2>
+    <p id="modal_alerta_detalle"></p>
+    <img id="modal_alerta_img" alt="Captura de la alerta">
+    <button class="peligro" onclick="cerrarModalAlerta()"><i class="fa-solid fa-check"></i> Entendido</button>
+  </div>
+</div>
+
+<script src="/web/aplicacion.js"></script>
+<script>
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const N = 112; // resolución de la grilla de simulación
+  const off = document.createElement('canvas');
+  off.width = N; off.height = N;
+  const offCtx = off.getContext('2d');
+  const imgData = offCtx.createImageData(N, N);
+
+  const PRESETS = [
+    { f:0.055, k:0.062 }, // coral
+    { f:0.026, k:0.055 }, // gusanos
+    { f:0.014, k:0.054 }, // mitosis
+    { f:0.035, k:0.065 }, // manchas
+    { f:0.018, k:0.051 }, // agujeros
+    { f:0.030, k:0.058 }  // laberinto
+  ];
+  const preset = PRESETS[Math.floor(Math.random()*PRESETS.length)];
+  const Du = 0.16, Dv = 0.08, dt = 1.0;
+
+  let u = new Float32Array(N*N).fill(1);
+  let v = new Float32Array(N*N).fill(0);
+  let u2 = new Float32Array(N*N);
+  let v2 = new Float32Array(N*N);
+
+  function idx(x,y){ return y*N + x; }
+
+  function seedBlob(cx, cy, r){
+    for(let y=-r; y<=r; y++){
+      for(let x=-r; x<=r; x++){
+        const d = Math.sqrt(x*x+y*y);
+        if(d <= r){
+          const xi = ((cx+x)%N+N)%N;
+          const yi = ((cy+y)%N+N)%N;
+          const i = idx(xi,yi);
+          const jitter = 0.85 + Math.random()*0.3;
+          u[i] = 0.5 * jitter;
+          v[i] = 0.25 * jitter;
+        }
+      }
+    }
+  }
+
+  // sembrado inicial aleatorio (distinto en cada carga)
+  const numBlobs = 5 + Math.floor(Math.random()*6);
+  for(let b=0; b<numBlobs; b++){
+    seedBlob(
+      Math.floor(Math.random()*N),
+      Math.floor(Math.random()*N),
+      3 + Math.floor(Math.random()*5)
+    );
+  }
+  // ruido de fondo leve para romper simetría
+  for(let i=0;i<N*N;i++){
+    if(Math.random() < 0.002){ v[i] = 0.4; u[i] = 0.4; }
+  }
+
+  function step(){
+    for(let y=0; y<N; y++){
+      const yN = (y-1+N)%N, yS = (y+1)%N;
+      for(let x=0; x<N; x++){
+        const xW = (x-1+N)%N, xE = (x+1)%N;
+        const i = idx(x,y);
+        const uC = u[i], vC = v[i];
+        const lapU = u[idx(xW,y)] + u[idx(xE,y)] + u[idx(x,yN)] + u[idx(x,yS)] - 4*uC;
+        const lapV = v[idx(xW,y)] + v[idx(xE,y)] + v[idx(x,yN)] + v[idx(x,yS)] - 4*vC;
+        const reaction = uC * vC * vC;
+        let nu = uC + (Du*lapU - reaction + preset.f*(1-uC)) * dt;
+        let nv = vC + (Dv*lapV + reaction - (preset.f+preset.k)*vC) * dt;
+        u2[i] = Math.min(1, Math.max(0, nu));
+        v2[i] = Math.min(1, Math.max(0, nv));
+      }
+    }
+    [u,u2] = [u2,u];
+    [v,v2] = [v2,v];
+  }
+
+  function render(){
+    const data = imgData.data;
+    for(let i=0; i<N*N; i++){
+      const val = Math.min(1, Math.max(0, v[i]));
+      const p = i*4;
+      data[p]   = 34;   // R (acento cian #22d3ee)
+      data[p+1] = 211;  // G
+      data[p+2] = 238;  // B
+      data[p+3] = Math.round(val * 190); // alpha, sutil
+    }
+    offCtx.putImageData(imgData, 0, 0);
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(off, 0, 0, N, N, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+  }
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const STEPS_PER_FRAME = 8;
+  function loop(){
+    for(let s=0; s<STEPS_PER_FRAME; s++) step();
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

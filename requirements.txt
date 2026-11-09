@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+supabase>=2.5
+pygrabber>=0.2
+opencv-python>=4.9
+numpy
+ultralytics>=8.3
+websockets

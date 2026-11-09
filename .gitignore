@@ -1,0 +1,28 @@
+# Secretos
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Modelos pesados (se descargan solos al primer arranque)
+modelos/*.onnx
+modelos/*.pt
+
+# Certificados TLS (se autogeneran al primer arranque)
+certs/
+
+# Logs locales
+logs/
+
+# Salidas locales
+*.csv
+capturas_alertas/
+
+# Editores / sistema
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

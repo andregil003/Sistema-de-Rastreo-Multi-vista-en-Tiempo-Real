@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Reconocimiento Facial Multi-cámara</title>
+<style>
+  :root{
+    --bg:#0f0f0f;
+    --accent:#22d3ee;
+    --text:#fafafa;
+    --secondary:#a8a8a8;
+    --border:#2e2e2e;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    height:100%;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    #bg-canvas{display:none;}
+  }
+
+  /* ---------- fondo animado ---------- */
+  #bg-canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:0;
+    pointer-events:none;
+  }
+  .bg-veil{
+    position:fixed;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(15,15,15,0) 0%, rgba(15,15,15,.35) 100%);
+  }
+
+  /* ---------- layout general ---------- */
+  .deck{
+    position:relative;
+    z-index:2;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  .viewport{
+    flex:1;
+    position:relative;
+    overflow:hidden;
+  }
+  .slide{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:flex-start;
+    padding:8vh 10vw;
+    opacity:0;
+    transform:translateY(14px);
+    transition:opacity .5s ease, transform .5s ease;
+    pointer-events:none;
+    overflow-y:auto;
+  }
+  .slide.active{
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+  }
+  .slide::-webkit-scrollbar{width:6px;}
+  .slide::-webkit-scrollbar-thumb{background:var(--border); border-radius:0;}
+
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:.75rem;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:1.2rem;
+  }
+  h1{
+    font-size:clamp(2.2rem, 5vw, 3.6rem);
+    font-weight:600;
+    line-height:1.12;
+    letter-spacing:-.01em;
+    max-width:14ch;
+  }
+  h2{
+    font-size:clamp(1.6rem, 3.4vw, 2.4rem);
+    font-weight:600;
+    letter-spacing:-.01em;
+    margin-bottom:.6rem;
+  }
+  p.lead{
+    color:var(--secondary);
+    font-size:1.05rem;
+    line-height:1.65;
+    max-width:56ch;
+    margin-top:1rem;
+  }
+  .divider{
+    width:48px;
+    height:2px;
+    background:var(--accent);
+    margin:1.6rem 0;
+    border:none;
+  }
+
+  /* ---------- tarjetas de 3 puntos ---------- */
+  .trio{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+    margin-top:2rem;
+    width:100%;
+    max-width:840px;
+  }
+  .trio .card{
+    background:var(--bg);
+    padding:1.6rem 1.4rem;
+  }
+  .trio .card .num{
+    font-family:var(--mono);
+    color:var(--accent);
+    font-size:.8rem;
+    letter-spacing:.1em;
+  }
+  .trio .card h3{
+    font-size:1rem;
+    font-weight:600;
+    margin:.6rem 0 .4rem;
+  }
+  .trio .card p{
+    color:var(--secondary);
+    font-size:.85rem;
+    line-height:1.5;
+  }
+  @media (max-width:760px){
+    .trio{grid-template-columns:1fr;}
+  }
+
+  /* ---------- acordeón ---------- */
+  .accordion{
+    width:100%;
+    max-width:760px;
+    margin-top:2rem;
+    border-top:1px solid var(--border);
+  }
+  .acc-item{
+    border-bottom:1px solid var(--border);
+  }
+  .acc-head{
+    width:100%;
+    background:none;
+    border:none;
+    color:var(--text);
+    font-family:var(--sans);
+    text-align:left;
+    padding:1rem 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:pointer;
+    font-size:.98rem;
+    gap:1rem;
+  }
+  .acc-head .tag{
+    font-family:var(--mono);
+    font-size:.72rem;
+    color:var(--secondary);
+    letter-spacing:.05em;
+  }
+  .acc-head .label{
+    flex:1;
+    font-weight:500;
+  }
+  .acc-head .chev{
+    font-family:var(--mono);
+    color:var(--accent);
+    font-size:1rem;
+    transition:transform .25s ease;
+    flex-shrink:0;
+  }
+  .acc-item.open .chev{transform:rotate(45deg);}
+  .acc-body{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .3s ease;
+  }
+  .acc-body-inner{
+    padding:0 0 1.1rem 0;
+    color:var(--secondary);
+    font-size:.88rem;
+    line-height:1.6;
+    max-width:64ch;
+  }
+  .acc-body-inner code{
+    font-family:var(--mono);
+    color:var(--accent);
+    font-size:.82em;
+  }
+
+  /* ---------- diagrama de capas ---------- */
+  .layers{
+    width:100%;
+    max-width:640px;
+    margin-top:2rem;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+  }
+  .layer{
+    border:1px solid var(--border);
+    border-top:none;
+    padding:.9rem 1.2rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:.86rem;
+  }
+  .layer:first-child{border-top:1px solid var(--border);}
+  .layer .lname{font-weight:600;}
+  .layer .ldesc{color:var(--secondary); font-family:var(--mono); font-size:.72rem;}
+  .arrow-down{
+    text-align:center;
+    color:var(--accent);
+    font-family:var(--mono);
+    font-size:.8rem;
+    padding:.15rem 0;
+  }
+
+  /* ---------- tabla simple ---------- */
+  table.simple{
+    width:100%;
+    max-width:760px;
+    border-collapse:collapse;
+    margin-top:2rem;
+    font-size:.86rem;
+  }
+  table.simple th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:.7rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--accent);
+    border-bottom:1px solid var(--border);
+    padding:0 0 .6rem 0;
+  }
+  table.simple td{
+    border-bottom:1px solid var(--border);
+    padding:.7rem 0;
+    color:var(--secondary);
+    vertical-align:top;
+  }
+  table.simple td:first-child{color:var(--text); white-space:nowrap; padding-right:1.4rem;}
+  table.simple .ok{color:var(--accent);}
+
+  /* ---------- navegación ---------- */
+  .nav{
+    position:relative;
+    z-index:3;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:1.4rem 10vw;
+    border-top:1px solid var(--border);
+    background:var(--bg);
+  }
+  .nav button{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--text);
+    width:38px;
+    height:38px;
+    font-size:1rem;
+    cursor:pointer;
+    font-family:var(--sans);
+    transition:border-color .2s ease, color .2s ease;
+  }
+  .nav button:hover{border-color:var(--accent); color:var(--accent);}
+  .nav button:disabled{opacity:.25; cursor:default;}
+  .nav button:disabled:hover{border-color:var(--border); color:var(--text);}
+  .nav-mid{
+    display:flex;
+    align-items:center;
+    gap:1.2rem;
+  }
+  .counter{
+    font-family:var(--mono);
+    font-size:.78rem;
+    color:var(--secondary);
+    letter-spacing:.05em;
+    min-width:64px;
+    text-align:center;
+  }
+  .dots{
+    display:flex;
+    gap:6px;
+  }
+  .dot{
+    width:5px;
+    height:5px;
+    background:var(--border);
+    cursor:pointer;
+    transition:background .2s ease, transform .2s ease;
+  }
+  .dot.active{background:var(--accent); transform:scale(1.6);}
+
+  .title-slide h1{max-width:16ch;}
+  .kicker{
+    font-family:var(--mono);
+    font-size:.72rem;
+    color:var(--secondary);
+    letter-spacing:.05em;
+    margin-top:2.2rem;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="bg-veil"></div>
+
+<div class="deck">
+  <div class="viewport" id="viewport">
+
+    <!-- 0 · PORTADA -->
+    <section class="slide title-slide">
+      <div class="eyebrow">Documentación técnica interactiva</div>
+      <h1>Sistema de Reconocimiento Facial Multi-cámara</h1>
+      <p class="lead">Vigilancia local en tiempo real: detección de rostros, identificación de personas registradas y alertas anti-spoofing, controladas desde un panel web.</p>
+      <div class="kicker">FastAPI · YuNet + SFace · YOLOv11n · Supabase</div>
+    </section>
+
+    <!-- 1 · QUÉ ES -->
+    <section class="slide">
+      <div class="eyebrow">01 — Qué es</div>
+      <h2>Un servidor de visión, no una app en la nube</h2>
+      <p class="lead">Conecta cámaras USB a tu PC, detecta y reconoce rostros en tiempo real, y avisa cuando alguien intenta engañar a una cámara mostrando una foto o video desde un celular. Todo corre en tu red local.</p>
+      <div class="trio">
+        <div class="card">
+          <div class="num">01</div>
+          <h3>Multi-cámara</h3>
+          <p>Hasta 4 cámaras USB gestionadas automáticamente, cada una con su propio hilo de captura.</p>
+        </div>
+        <div class="card">
+          <div class="num">02</div>
+          <h3>Reconocimiento</h3>
+          <p>Detecta rostros, calcula un embedding de 128 dimensiones y lo compara contra los registrados.</p>
+        </div>
+        <div class="card">
+          <div class="num">03</div>
+          <h3>Anti-spoofing</h3>
+          <p>Detecta celulares superpuestos a un rostro: alguien podría estar mostrando una foto o video.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · ARQUITECTURA POR CAPAS -->
+    <section class="slide">
+      <div class="eyebrow">02 — Arquitectura</div>
+      <h2>Seis capas, una sola dirección</h2>
+      <p class="lead" style="margin-top:.4rem;">Cada capa solo conoce a la de abajo. Cambiar de cámara o de proveedor de base de datos afecta a una sola capa.</p>
+      <div class="layers">
+        <div class="layer"><span class="lname">Presentación</span><span class="ldesc">pagina_web/</span></div>
+        <div class="arrow-down">↓</div>
+        <div class="layer"><span class="lname">Orquestación</span><span class="ldesc">servidor_web_principal.py</span></div>
+        <div class="arrow-down">↓</div>
+        <div class="layer"><span class="lname">Dispositivos</span><span class="ldesc">gestor_camaras_*</span></div>
+        <div class="arrow-down">↓</div>
+        <div class="layer"><span class="lname">Inteligencia</span><span class="ldesc">motor facial · anti-replay · stats</span></div>
+        <div class="arrow-down">↓</div>
+        <div class="layer"><span class="lname">Persistencia</span><span class="ldesc">conexion_supabase_rostros.py</span></div>
+        <div class="arrow-down">↓</div>
+        <div class="layer"><span class="lname">Arranque</span><span class="ldesc">iniciar_servidores.py</span></div>
+      </div>
+    </section>
+
+    <!-- 3 · FLUJO POR FRAME -->
+    <section class="slide">
+      <div class="eyebrow">03 — Flujo de datos</div>
+      <h2>Qué pasa con cada frame</h2>
+      <p class="lead" style="margin-top:.4rem;">Ciclo continuo (~10 veces por segundo) que separa el video fluido del análisis pesado.</p>
+      <div class="accordion" id="acc-flujo"></div>
+    </section>
+
+    <!-- 4 · STACK -->
+    <section class="slide">
+      <div class="eyebrow">04 — Stack tecnológico</div>
+      <h2>Sin frameworks pesados en el frontend</h2>
+      <div class="accordion" id="acc-stack"></div>
+    </section>
+
+    <!-- 5 · MÓDULOS BACKEND -->
+    <section class="slide">
+      <div class="eyebrow">05 — Backend</div>
+      <h2>Nueve módulos, un propósito cada uno</h2>
+      <div class="accordion" id="acc-backend"></div>
+    </section>
+
+    <!-- 6 · FRONTEND -->
+    <section class="slide">
+      <div class="eyebrow">06 — Frontend</div>
+      <h2>Dos apps, un mismo sistema de diseño</h2>
+      <p class="lead" style="margin-top:.4rem;">Dashboard para PC y una página ligera para que cada quien se registre desde su celular.</p>
+      <div class="accordion" id="acc-frontend"></div>
+    </section>
+
+    <!-- 7 · BASE DE DATOS -->
+    <section class="slide">
+      <div class="eyebrow">07 — Base de datos</div>
+      <h2>Supabase: Postgres + Storage</h2>
+      <table class="simple">
+        <thead><tr><th>Tabla</th><th>Contenido</th></tr></thead>
+        <tbody>
+          <tr><td>personas</td><td>Registro maestro: nombre, código de registro, fecha</td></tr>
+          <tr><td>rostros_entrenados</td><td>Embeddings de 128 valores por persona (galería de comparación)</td></tr>
+          <tr><td>eventos_deteccion</td><td>Historial de reconocimientos, confianza y distancia estimada</td></tr>
+          <tr><td>alertas_replay</td><td>Alertas anti-spoofing con captura de pantalla</td></tr>
+        </tbody>
+      </table>
+      <p class="lead" style="font-size:.85rem; margin-top:1.4rem;">RLS activo en las 4 tablas — <span style="color:var(--accent)">solo el backend</span>, con la service key, puede leer o escribir.</p>
+    </section>
+
+    <!-- 8 · SIN INTERNET -->
+    <section class="slide">
+      <div class="eyebrow">08 — Dependencia de internet</div>
+      <h2>El video funciona siempre</h2>
+      <table class="simple">
+        <thead><tr><th>Función</th><th>Sin conexión</th></tr></thead>
+        <tbody>
+          <tr><td>Streams, overlay, control de cámaras</td><td class="ok">Funciona</td></tr>
+          <tr><td>Reconocer personas conocidas</td><td>Requiere internet (galería en Supabase)</td></tr>
+          <tr><td>Registro de personas nuevas</td><td>Requiere internet</td></tr>
+          <tr><td>Historial persistente de alertas</td><td>Requiere internet (en pantalla sí avisa)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 9 · SEGURIDAD -->
+    <section class="slide">
+      <div class="eyebrow">09 — Seguridad</div>
+      <h2>Datos biométricos, tratados con cuidado</h2>
+      <div class="accordion" id="acc-seguridad"></div>
+    </section>
+
+    <!-- 10 · CIERRE -->
+    <section class="slide title-slide">
+      <div class="eyebrow">Fin</div>
+      <h1>Video local. Reconocimiento en la nube. Control total.</h1>
+      <p class="lead">Un sistema pensado para operar en red local, con la nube solo como galería y memoria — nunca como dependencia para ver.</p>
+      <div class="kicker">Sistema de Rastreo Multi-vista en Tiempo Real</div>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button id="prevBtn" aria-label="Anterior">←</button>
+    <div class="nav-mid">
+      <span class="counter" id="counter">01 / 11</span>
+      <div class="dots" id="dots"></div>
+    </div>
+    <button id="nextBtn" aria-label="Siguiente">→</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONTENIDO DE ACORDEONES
+   ========================================================= */
+const ACORDEONES = {
+  'acc-flujo': [
+    { tag:'01', label:'Captura continua', body:'Cada cámara USB tiene su propio hilo daemon que lee <code>cap.read()</code> sin parar y guarda el último frame bajo lock.' },
+    { tag:'02', label:'Publicación de video', body:'El bucle principal toma ese frame, dibuja encima el último overlay conocido, y lo publica como JPEG para los <code>&lt;img&gt;</code> MJPEG del navegador (~12 fps).' },
+    { tag:'03', label:'Análisis pesado en paralelo', body:'Sin bloquear el video, cada <code>fps_reconocimiento_ms</code> (300 ms por defecto) corre en un hilo: detección de rostro, embedding, identificación y chequeo de celular.' },
+    { tag:'04', label:'Difusión y persistencia', body:'Los eventos relevantes —nueva alerta, nuevo registro, cambio de cámaras— se empujan a todos los dashboards por WebSocket y se guardan en Supabase.' }
+  ],
+  'acc-stack': [
+    { tag:'Backend', label:'FastAPI + OpenCV + YOLOv11n', body:'Servidor asíncrono en Python. <code>YuNet</code> detecta rostros, <code>SFace</code> genera embeddings de 128D comparados por distancia coseno, <code>YOLOv11n</code> detecta celulares para el anti-spoofing.' },
+    { tag:'Frontend', label:'JavaScript sin build', body:'Dashboard y modo móvil escritos en JS plano, sin frameworks. Video vía streams MJPEG, eventos en vivo vía WebSocket <code>/ws/dashboard</code>.' },
+    { tag:'Datos', label:'Supabase (Postgres + Storage)', body:'Persona, embeddings, eventos y alertas en Postgres; fotos de rostros y capturas de alerta en un bucket de Storage.' },
+    { tag:'Red', label:'HTTP + HTTPS local', body:'Puerto 8000 para el PC, 8443 con certificado autofirmado para que el celular pueda usar la cámara (requisito de <code>getUserMedia</code>).' }
+  ],
+  'acc-backend': [
+    { tag:'01', label:'iniciar_servidores.py', body:'Punto de entrada: levanta HTTP y HTTPS en hilos separados y abre el navegador cuando el servidor responde.' },
+    { tag:'02', label:'servidor_web_principal.py', body:'El núcleo: API REST, WebSockets y el bucle de procesamiento asíncrono que coordina todo lo demás.' },
+    { tag:'03', label:'gestor_camaras_usb_locales.py', body:'Ciclo de vida de cada cámara USB: abrir, apagar, reintentar tras un fallo, liberar el dispositivo al cerrar.' },
+    { tag:'04', label:'motor_reconocimiento_facial_yunet_sface.py', body:'Detección con YuNet y reconocimiento con SFace: entra un frame, salen identidades con similitud y distancia estimada.' },
+    { tag:'05', label:'detector_replay_telefono_yolo.py', body:'Corre YOLOv11n cada N ciclos para detectar un celular superpuesto a un rostro y disparar la alerta anti-spoofing.' },
+    { tag:'06', label:'calculador_estadisticas_persona.py', body:'Tiempo en escena, número de detecciones y confianza acumulada por cada persona reconocida.' },
+    { tag:'07', label:'conexion_supabase_rostros.py', body:'Única capa que habla con la nube: registra personas, guarda embeddings, eventos y alertas, gestiona el borrado.' },
+    { tag:'08', label:'generador_certificado_https.py', body:'Genera un certificado RSA-2048 autofirmado válido 10 años, con la IP local como SAN, para habilitar HTTPS en el celular.' }
+  ],
+  'acc-frontend': [
+    { tag:'PC', label:'Dashboard — index.html', body:'Pestañas: <code>Reconocimiento</code>, <code>Cámaras</code>, <code>Registro</code>, <code>Alertas</code> y <code>Personas</code>. Video principal con badge en vivo, reloj y pantalla completa.' },
+    { tag:'Móvil', label:'Modo celular — /movil', body:'Página ligera con cámara frontal para autoregistro y una sección "Mi actividad" con el historial personal de reconocimientos.' },
+    { tag:'Estilo', label:'estilos_meet.css', body:'Tokens de diseño oscuro y minimalista: fondo <code>#0f0f0f</code>, acento <code>#22d3ee</code>, tipografías Inter y JetBrains Mono.' }
+  ],
+  'acc-seguridad': [
+    { tag:'01', label:'HTTPS autofirmado', body:'Cifrado real dentro de la red local; el aviso de certificado en el navegador es esperado y no indica un problema.' },
+    { tag:'02', label:'.env fuera de Git', body:'La service key de Supabase nunca se publica ni se comparte; vive solo en el archivo local <code>.env</code>.' },
+    { tag:'03', label:'RLS en Supabase', body:'Las cuatro tablas bloquean el acceso público directo: solo el backend, con la service key, puede leer o escribir.' },
+    { tag:'04', label:'Código de registro opcional', body:'Si se define <code>CODIGO_SECRETO_REGISTRO</code>, solo quien lo conozca puede registrar un rostro nuevo.' },
+    { tag:'05', label:'Datos biométricos', body:'Al eliminar una persona se borran también sus fotos: una limpieza completa, no solo el registro en la base de datos.' }
+  ]
+};
+
+function construirAcordeones(){
+  Object.entries(ACORDEONES).forEach(([id, items])=>{
+    const cont = document.getElementById(id);
+    if(!cont) return;
+    items.forEach((it, idx)=>{
+      const item = document.createElement('div');
+      item.className = 'acc-item';
+      item.innerHTML = `
+        <button class="acc-head" type="button">
+          <span class="tag">${it.tag}</span>
+          <span class="label">${it.label}</span>
+          <span class="chev">+</span>
+        </button>
+        <div class="acc-body"><div class="acc-body-inner">${it.body}</div></div>
+      `;
+      const head = item.querySelector('.acc-head');
+      const body = item.querySelector('.acc-body');
+      head.addEventListener('click', ()=>{
+        const isOpen = item.classList.contains('open');
+        cont.querySelectorAll('.acc-item.open').forEach(o=>{
+          o.classList.remove('open');
+          o.querySelector('.acc-body').style.maxHeight = null;
+        });
+        if(!isOpen){
+          item.classList.add('open');
+          body.style.maxHeight = body.scrollHeight + 'px';
+        }
+      });
+      cont.appendChild(item);
+    });
+  });
+}
+construirAcordeones();
+
+/* =========================================================
+   NAVEGACIÓN DE SLIDES
+   ========================================================= */
+const slides = Array.from(document.querySelectorAll('.slide'));
+const total = slides.length;
+let current = 0;
+
+const dotsWrap = document.getElementById('dots');
+slides.forEach((_, i)=>{
+  const d = document.createElement('div');
+  d.className = 'dot' + (i===0 ? ' active' : '');
+  d.addEventListener('click', ()=> goTo(i));
+  dotsWrap.appendChild(d);
+});
+const dots = Array.from(dotsWrap.children);
+const counter = document.getElementById('counter');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function goTo(i){
+  if(i < 0 || i >= total) return;
+  slides[current].classList.remove('active');
+  dots[current].classList.remove('active');
+  current = i;
+  slides[current].classList.add('active');
+  dots[current].classList.add('active');
+  counter.textContent = `${pad(current+1)} / ${pad(total)}`;
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === total-1;
+}
+prevBtn.addEventListener('click', ()=> goTo(current-1));
+nextBtn.addEventListener('click', ()=> goTo(current+1));
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'ArrowRight') goTo(current+1);
+  if(e.key === 'ArrowLeft') goTo(current-1);
+});
+goTo(0);
+
+/* =========================================================
+   FONDO — PATRÓN DE TURING (Gray-Scott reaction-diffusion)
+   Aleatorio en cada carga. No depende del mouse.
+   ========================================================= */
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const N = 112; // resolución de la grilla de simulación
+  const off = document.createElement('canvas');
+  off.width = N; off.height = N;
+  const offCtx = off.getContext('2d');
+  const imgData = offCtx.createImageData(N, N);
+
+  const PRESETS = [
+    { f:0.055, k:0.062 }, // coral
+    { f:0.026, k:0.055 }, // gusanos
+    { f:0.014, k:0.054 }, // mitosis
+    { f:0.035, k:0.065 }, // manchas
+    { f:0.018, k:0.051 }, // agujeros
+    { f:0.030, k:0.058 }  // laberinto
+  ];
+  const preset = PRESETS[Math.floor(Math.random()*PRESETS.length)];
+  const Du = 0.16, Dv = 0.08, dt = 1.0;
+
+  let u = new Float32Array(N*N).fill(1);
+  let v = new Float32Array(N*N).fill(0);
+  let u2 = new Float32Array(N*N);
+  let v2 = new Float32Array(N*N);
+
+  function idx(x,y){ return y*N + x; }
+
+  function seedBlob(cx, cy, r){
+    for(let y=-r; y<=r; y++){
+      for(let x=-r; x<=r; x++){
+        const d = Math.sqrt(x*x+y*y);
+        if(d <= r){
+          const xi = ((cx+x)%N+N)%N;
+          const yi = ((cy+y)%N+N)%N;
+          const i = idx(xi,yi);
+          const jitter = 0.85 + Math.random()*0.3;
+          u[i] = 0.5 * jitter;
+          v[i] = 0.25 * jitter;
+        }
+      }
+    }
+  }
+
+  // sembrado inicial aleatorio (distinto en cada carga)
+  const numBlobs = 5 + Math.floor(Math.random()*6);
+  for(let b=0; b<numBlobs; b++){
+    seedBlob(
+      Math.floor(Math.random()*N),
+      Math.floor(Math.random()*N),
+      3 + Math.floor(Math.random()*5)
+    );
+  }
+  // ruido de fondo leve para romper simetría
+  for(let i=0;i<N*N;i++){
+    if(Math.random() < 0.002){ v[i] = 0.4; u[i] = 0.4; }
+  }
+
+  function step(){
+    for(let y=0; y<N; y++){
+      const yN = (y-1+N)%N, yS = (y+1)%N;
+      for(let x=0; x<N; x++){
+        const xW = (x-1+N)%N, xE = (x+1)%N;
+        const i = idx(x,y);
+        const uC = u[i], vC = v[i];
+        const lapU = u[idx(xW,y)] + u[idx(xE,y)] + u[idx(x,yN)] + u[idx(x,yS)] - 4*uC;
+        const lapV = v[idx(xW,y)] + v[idx(xE,y)] + v[idx(x,yN)] + v[idx(x,yS)] - 4*vC;
+        const reaction = uC * vC * vC;
+        let nu = uC + (Du*lapU - reaction + preset.f*(1-uC)) * dt;
+        let nv = vC + (Dv*lapV + reaction - (preset.f+preset.k)*vC) * dt;
+        u2[i] = Math.min(1, Math.max(0, nu));
+        v2[i] = Math.min(1, Math.max(0, nv));
+      }
+    }
+    [u,u2] = [u2,u];
+    [v,v2] = [v2,v];
+  }
+
+  function render(){
+    const data = imgData.data;
+    for(let i=0; i<N*N; i++){
+      const val = Math.min(1, Math.max(0, v[i]));
+      const p = i*4;
+      data[p]   = 34;   // R (acento cian #22d3ee)
+      data[p+1] = 211;  // G
+      data[p+2] = 238;  // B
+      data[p+3] = Math.round(val * 190); // alpha, sutil
+    }
+    offCtx.putImageData(imgData, 0, 0);
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(off, 0, 0, N, N, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+  }
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const STEPS_PER_FRAME = 8;
+  function loop(){
+    for(let s=0; s<STEPS_PER_FRAME; s++) step();
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
